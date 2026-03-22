@@ -1,6 +1,6 @@
 # Smotrim Downloader
 
-Простой и надёжный графический загрузчик видео с сайта smotrim.ru.
+Простой и надёжный графический загрузчик видео с c видеохостинга.
 
 ![Версия](https://img.shields.io/badge/version-0.1.0-blue.svg)
 ![Лицензия](https://img.shields.io/badge/license-GPLv3-green.svg)
