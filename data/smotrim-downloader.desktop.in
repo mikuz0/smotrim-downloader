@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Smotrim Downloader
+Comment=Download videos from smotrim.ru
+Exec=@BINDIR@/smotrim-downloader
+Icon=applications-multimedia
+Terminal=false
+Type=Application
+Categories=Network;Video;
+StartupNotify=true

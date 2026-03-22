@@ -1,0 +1,13 @@
+smotrim-downloader/
+├── meson.build
+├── src/
+│   ├── meson.build
+│   ├── main.vala
+│   ├── application.vala
+│   ├── main_window.vala
+│   ├── download_row.vala
+│   ├── download_manager.vala
+│   └── settings.vala
+└── data/
+    ├── meson.build
+    └── smotrim-downloader.desktop.in
