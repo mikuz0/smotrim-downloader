@@ -7,7 +7,7 @@ public class MainWindow : Gtk.ApplicationWindow {
     private Label status_label;
     private Button start_all_button;
     private DownloadManager download_manager;
-    private AppSettings settings;
+    private Settings settings;
     private Label stats_label;
     
     public MainWindow(Gtk.Application app) {
@@ -16,11 +16,13 @@ public class MainWindow : Gtk.ApplicationWindow {
         this.set_default_size(900, 600);
         this.window_position = WindowPosition.CENTER;
         
-        settings = new AppSettings();
+        settings = new Settings();
         settings.ensure_download_folder_exists();
         
         download_manager = new DownloadManager();
         download_manager.set_download_folder(settings.download_folder);
+        download_manager.set_ytdlp_path(settings.ytdlp_path);
+        download_manager.set_ffmpeg_path(settings.ffmpeg_path);
         download_manager.download_status_changed.connect(on_download_status_changed);
         download_manager.all_completed.connect(on_all_completed);
         download_manager.queue_updated.connect(update_stats);
@@ -62,9 +64,6 @@ public class MainWindow : Gtk.ApplicationWindow {
             }
             .download-row:hover {
                 background-color: #f5f5f5;
-            }
-            .progress-bar {
-                min-height: 20px;
             }
         """;
         
@@ -131,6 +130,10 @@ public class MainWindow : Gtk.ApplicationWindow {
         folder_btn.clicked.connect(on_folder_clicked);
         toolbar.pack_start(folder_btn, false, false, 0);
         
+        var settings_btn = new Button.with_label("⚙ Настройки");
+        settings_btn.clicked.connect(on_settings_clicked);
+        toolbar.pack_start(settings_btn, false, false, 0);
+        
         return toolbar;
     }
     
@@ -175,7 +178,12 @@ public class MainWindow : Gtk.ApplicationWindow {
     private void on_add_clicked() {
         string url = url_entry.text.strip();
         if (url != "") {
-            var row = new DownloadRow(url, settings.download_folder);
+            var row = new DownloadRow(
+                url,
+                settings.download_folder,
+                download_manager.get_ytdlp_path(),
+                download_manager.get_ffmpeg_path()
+            );
             row.download_finished.connect(on_download_finished);
             
             listbox.add(row);
@@ -231,10 +239,22 @@ public class MainWindow : Gtk.ApplicationWindow {
             string folder = dialog.get_filename();
             settings.download_folder = folder;
             settings.ensure_download_folder_exists();
+            download_manager.set_download_folder(folder);
             status_label.label = @"Папка загрузок: $folder";
         }
         
         dialog.destroy();
+    }
+    
+    private void on_settings_clicked() {
+        var dialog = new SettingsDialog(this, settings, download_manager);
+        dialog.run();
+        
+        // Обновляем пути в менеджере
+        download_manager.set_ytdlp_path(settings.ytdlp_path);
+        download_manager.set_ffmpeg_path(settings.ffmpeg_path);
+        
+        status_label.label = @"Папка: $(settings.download_folder)";
     }
     
     private void on_download_finished(DownloadRow row, bool success, string message) {
@@ -247,7 +267,6 @@ public class MainWindow : Gtk.ApplicationWindow {
     }
     
     private void on_download_status_changed() {
-        // Обновляем состояние кнопки
         if (download_manager.has_pending() && !download_manager.has_active()) {
             start_all_button.sensitive = true;
         } else if (download_manager.has_active()) {

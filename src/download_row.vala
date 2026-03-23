@@ -16,10 +16,15 @@ public class DownloadRow : Box {
     
     private int child_pid;
     private uint child_watch_id;
+    private uint timeout_id;
     private bool is_cancelled;
     private bool is_finished;
+    private bool process_completed;
     
     private string stream_url;
+    private string ytdlp_path;
+    private string ffmpeg_path;
+    private string download_folder;
     
     public signal void download_started(DownloadRow row);
     public signal void download_finished(DownloadRow row, bool success, string message);
@@ -40,10 +45,12 @@ public class DownloadRow : Box {
         }
     }
     
-    public DownloadRow(string url, string download_folder) {
+    public DownloadRow(string url, string download_folder, string ytdlp_path, string ffmpeg_path) {
         Object(orientation: Orientation.HORIZONTAL, spacing: 6);
         this.url = url;
         this.download_folder = download_folder;
+        this.ytdlp_path = ytdlp_path;
+        this.ffmpeg_path = ffmpeg_path;
         this._status = "pending";
         this._queue_position = 0;
         this.file_size = "";
@@ -51,6 +58,10 @@ public class DownloadRow : Box {
         this.stream_url = "";
         this.is_cancelled = false;
         this.is_finished = false;
+        this.process_completed = false;
+        this.child_pid = 0;
+        this.child_watch_id = 0;
+        this.timeout_id = 0;
         
         margin_top = 3;
         margin_bottom = 3;
@@ -155,11 +166,9 @@ public class DownloadRow : Box {
         get_video_info();
     }
     
-    private string download_folder;
-    
     private void get_video_info() {
         string[] argv = {
-            "yt-dlp",
+            ytdlp_path,
             "--print", "%(title)s",
             "--print", "%(filesize_approx)s",
             "-g",
@@ -183,6 +192,23 @@ public class DownloadRow : Box {
                                            null);
             
             this.child_pid = child_pid;
+            process_completed = false;
+            
+            // Таймаут 30 секунд на получение информации
+            timeout_id = Timeout.add_seconds(30, () => {
+                if (!process_completed && child_pid > 0) {
+                    print("Timeout: yt-dlp is taking too long, killing process %d\n", child_pid);
+                    Posix.kill(child_pid, Posix.SIGTERM);
+                    Timeout.add_seconds(2, () => {
+                        if (!process_completed && child_pid > 0) {
+                            Posix.kill(child_pid, Posix.SIGKILL);
+                        }
+                        return false;
+                    });
+                }
+                timeout_id = 0;
+                return false;
+            });
             
             var channel = new IOChannel.unix_new(stdout_fd);
             try {
@@ -201,34 +227,63 @@ public class DownloadRow : Box {
             
             Posix.close(stdout_fd);
             
-            // Парсим вывод
-            string[] lines = output.split("\n");
-            foreach (string l in lines) {
-                string ln = l.strip();
-                if (ln.has_prefix("http")) {
-                    stream_url = ln;
-                } else if (title == "" && !ln.has_prefix("http") && ln != "") {
-                    title = ln;
-                    // Очищаем название
-                    title = title.replace("/", "_");
-                    title = title.replace("\\", "_");
-                    title = title.replace(":", "_");
-                    title = title.replace("*", "_");
-                    title = title.replace("?", "_");
-                    title = title.replace("\"", "_");
-                    title = title.replace("<", "_");
-                    title = title.replace(">", "_");
-                    title = title.replace("|", "_");
-                } else if (file_size == "" && ln != "") {
-                    int64 size = int64.parse(ln);
-                    if (size > 0) {
-                        file_size = format_size(size);
+            // Ждём завершения процесса с таймаутом
+            int status;
+            int64 start_time = get_monotonic_time();
+            int64 timeout_us = 30 * 1000000;
+            
+            while (true) {
+                int ret = Posix.waitpid(child_pid, out status, Posix.WNOHANG);
+                if (ret == child_pid) {
+                    process_completed = true;
+                    if (timeout_id > 0) {
+                        Source.remove(timeout_id);
+                        timeout_id = 0;
+                    }
+                    break;
+                }
+                if (ret == -1) {
+                    process_completed = true;
+                    break;
+                }
+                int64 elapsed = get_monotonic_time() - start_time;
+                if (elapsed >= timeout_us) {
+                    print("Timeout: yt-dlp process %d did not finish\n", child_pid);
+                    Posix.kill(child_pid, Posix.SIGTERM);
+                    Thread.usleep(2000000);
+                    Posix.kill(child_pid, Posix.SIGKILL);
+                    Posix.waitpid(child_pid, out status, 0);
+                    process_completed = true;
+                    break;
+                }
+                Thread.usleep(100000);
+            }
+            
+            if (process_completed && status == 0 && stream_url == "") {
+                string[] lines = output.split("\n");
+                foreach (string l in lines) {
+                    string ln = l.strip();
+                    if (ln.has_prefix("http")) {
+                        stream_url = ln;
+                    } else if (title == "" && !ln.has_prefix("http") && ln != "") {
+                        title = ln;
+                        title = title.replace("/", "_");
+                        title = title.replace("\\", "_");
+                        title = title.replace(":", "_");
+                        title = title.replace("*", "_");
+                        title = title.replace("?", "_");
+                        title = title.replace("\"", "_");
+                        title = title.replace("<", "_");
+                        title = title.replace(">", "_");
+                        title = title.replace("|", "_");
+                    } else if (file_size == "" && ln != "") {
+                        int64 size = int64.parse(ln);
+                        if (size > 0) {
+                            file_size = format_size(size);
+                        }
                     }
                 }
             }
-            
-            int status;
-            Posix.waitpid(child_pid, out status, 0);
             
             if (stream_url != "") {
                 start_ffmpeg_download();
@@ -251,14 +306,13 @@ public class DownloadRow : Box {
     }
     
     private void start_ffmpeg_download() {
-        string download_dir = download_folder;
-        DirUtils.create_with_parents(download_dir, 0755);
+        DirUtils.create_with_parents(download_folder, 0755);
         
         string safe_title = title != "" ? title : "video";
-        string output_file = Path.build_filename(download_dir, safe_title + ".mp4");
+        string output_file = Path.build_filename(download_folder, safe_title + ".mp4");
         
         string[] argv = {
-            "ffmpeg",
+            ffmpeg_path,
             "-i", stream_url,
             "-c", "copy",
             "-y",
@@ -269,21 +323,20 @@ public class DownloadRow : Box {
         try {
             int child_pid;
             
-            // Запускаем ffmpeg БЕЗ чтения вывода (stdout и stderr = null)
             Process.spawn_async_with_pipes(null,
                                            argv,
                                            null,
                                            SpawnFlags.SEARCH_PATH | SpawnFlags.DO_NOT_REAP_CHILD,
                                            null,
                                            out child_pid,
-                                           null,   // stdin
-                                           null,   // stdout — не читаем!
-                                           null);  // stderr — не читаем!
+                                           null,
+                                           null,
+                                           null);
             
             this.child_pid = child_pid;
             status = "downloading";
+            process_completed = false;
             
-            // Просто ждём завершения
             this.child_watch_id = ChildWatch.add((Pid)child_pid, on_ffmpeg_exit);
             
         } catch (SpawnError e) {
@@ -293,6 +346,8 @@ public class DownloadRow : Box {
     }
     
     private void on_ffmpeg_exit(Pid pid, int status) {
+        process_completed = true;
+        
         Idle.add(() => {
             if (is_cancelled) return false;
             
@@ -316,6 +371,10 @@ public class DownloadRow : Box {
     
     private void cleanup() {
         is_finished = true;
+        if (timeout_id > 0) {
+            Source.remove(timeout_id);
+            timeout_id = 0;
+        }
         child_pid = 0;
     }
     
@@ -325,6 +384,13 @@ public class DownloadRow : Box {
         
         if (child_pid > 0) {
             Posix.kill(child_pid, Posix.SIGTERM);
+            
+            Timeout.add_seconds(2, () => {
+                if (!process_completed && child_pid > 0) {
+                    Posix.kill(child_pid, Posix.SIGKILL);
+                }
+                return false;
+            });
         }
         
         status = "cancelled";

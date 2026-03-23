@@ -5,6 +5,9 @@ public class DownloadManager : Object {
     private List<DownloadRow> pending_queue;
     private DownloadRow active_download;
     private bool is_downloading;
+    private string download_folder;
+    private string ytdlp_path;
+    private string ffmpeg_path;
     
     public signal void download_status_changed();
     public signal void all_completed();
@@ -15,6 +18,34 @@ public class DownloadManager : Object {
         pending_queue = new List<DownloadRow>();
         active_download = null;
         is_downloading = false;
+        download_folder = "";
+        ytdlp_path = "yt-dlp";
+        ffmpeg_path = "ffmpeg";
+    }
+    
+    public void set_download_folder(string folder) {
+        download_folder = folder;
+        DirUtils.create_with_parents(download_folder, 0755);
+    }
+    
+    public string get_download_folder() {
+        return download_folder;
+    }
+    
+    public void set_ytdlp_path(string path) {
+        ytdlp_path = path;
+    }
+    
+    public string get_ytdlp_path() {
+        return ytdlp_path;
+    }
+    
+    public void set_ffmpeg_path(string path) {
+        ffmpeg_path = path;
+    }
+    
+    public string get_ffmpeg_path() {
+        return ffmpeg_path;
     }
     
     public void add_download(DownloadRow row) {
@@ -71,7 +102,6 @@ public class DownloadManager : Object {
         if (active_download == row) {
             active_download = null;
             is_downloading = false;
-            
             start_next();
         }
         
@@ -125,10 +155,6 @@ public class DownloadManager : Object {
     
     public int get_total_count() {
         return (int)downloads.length();
-    }
-    
-    public void set_download_folder(string folder) {
-        // Папка передаётся через DownloadRow при создании
     }
     
     public DownloadRow? get_active_download() {
