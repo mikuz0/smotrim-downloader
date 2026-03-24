@@ -1,0 +1,55 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FAFAFA
+title Smotrim Downloader - Download Sequence
+
+actor User as user
+participant "MainWindow" as main
+participant "DownloadManager" as manager
+participant "DownloadRow" as row
+participant "yt-dlp" as ytdlp
+participant "ffmpeg" as ffmpeg
+participant "FileSystem" as fs
+
+user -> main: Ввод URL и нажатие "Добавить"
+main -> row: new DownloadRow(url, folder, ytdlp_path, ffmpeg_path)
+main -> manager: add_download(row)
+manager -> manager: добавить в pending_queue
+manager -> manager: update_queue_positions()
+
+user -> main: Нажать "Начать загрузку"
+main -> manager: start_all()
+manager -> manager: start_next()
+manager -> row: start_download()
+activate row
+
+row -> ytdlp: spawn_async_with_pipes()
+note right of ytdlp: yt-dlp --print title\\n--print filesize\\n-g -f best {url}
+ytdlp --> row: stdout (title, size, stream_url)
+row -> row: парсинг информации
+row -> row: сохранить title, file_size, stream_url
+
+row -> ffmpeg: spawn_async_with_pipes()
+note right of ffmpeg: ffmpeg -i {stream_url} -c copy -y {output_file}
+ffmpeg -> fs: запись файла
+
+alt Загрузка завершена
+    ffmpeg --> row: exit(0)
+    row -> manager: download_finished(true)
+    manager -> manager: start_next()
+else Ошибка
+    ffmpeg --> row: exit(не 0)
+    row -> manager: download_finished(false)
+    manager -> manager: статус error
+else Отмена пользователем
+    user -> row: нажать ✖
+    row -> ffmpeg: SIGTERM
+    row -> manager: download_finished(false, "cancelled")
+    manager -> manager: start_next()
+end
+
+deactivate row
+manager -> main: all_completed()
+main -> user: обновление статуса
+
+@enduml

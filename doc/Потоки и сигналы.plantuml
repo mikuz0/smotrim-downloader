@@ -1,0 +1,32 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FAFAFA
+
+title DownloadRow - State Machine
+
+[*] --> pending : создание
+
+pending --> processing : start_download()
+pending --> [*] : очистка
+
+processing --> get_url : get_video_info()
+
+state get_url {
+    [*] --> ytdlp_run
+    ytdlp_run --> ytdlp_reading : чтение stdout
+    ytdlp_reading --> ytdlp_wait : ожидание завершения
+    ytdlp_wait --> [*] : успех/таймаут
+}
+
+get_url --> downloading : stream_url получен
+get_url --> error : ошибка
+
+downloading --> finished : ffmpeg exit(0)
+downloading --> error : ffmpeg exit(не 0)
+downloading --> cancelled : on_cancel()
+
+finished --> [*] : очистка
+error --> [*] : очистка
+cancelled --> [*] : очистка
+
+@enduml

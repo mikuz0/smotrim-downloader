@@ -1,0 +1,41 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FAFAFA
+
+title Project Structure
+
+package "smotrim-downloader/" {
+    file "meson.build" as meson_root
+    
+    package "src/" {
+        file "meson.build" as meson_src
+        file "main.vala" as main
+        file "application.vala" as app
+        file "main_window.vala" as main_win
+        file "download_row.vala" as row
+        file "download_manager.vala" as manager
+        file "settings.vala" as settings
+        file "settings_dialog.vala" as settings_dlg
+    }
+    
+    package "data/" {
+        file "meson.build" as meson_data
+        file "smotrim-downloader.desktop.in" as desktop
+    }
+}
+
+note right of meson_root
+  **Корневой meson.build:**
+  * Определяет проект
+  * Находит зависимости
+  * Подключает src/ и data/
+end note
+
+note right of meson_src
+  **src/meson.build:**
+  * Компилирует все .vala файлы
+  * Линкует с GTK и GLib
+  * Создаёт исполняемый файл
+end note
+
+@enduml

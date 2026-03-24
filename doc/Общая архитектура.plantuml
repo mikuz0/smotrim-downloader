@@ -1,0 +1,128 @@
+@startuml
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FAFAFA
+skinparam class {
+  BackgroundColor White
+  BorderColor #2C3E50
+  ArrowColor #3498DB
+}
+
+title Smotrim Downloader - Class Diagram
+
+class SmotrimDownloader {
+  - MainWindow main_window
+  + activate()
+  + startup()
+  + on_quit()
+  + on_about()
+}
+
+class MainWindow {
+  - Entry url_entry
+  - ListBox listbox
+  - Label status_label
+  - Button start_all_button
+  - DownloadManager download_manager
+  - Settings settings
+  - Label stats_label
+  + MainWindow(app)
+  - create_widgets()
+  - create_toolbar()
+  - create_statusbar()
+  - load_css()
+  - on_add_clicked()
+  - on_start_all_clicked()
+  - on_clear_clicked()
+  - on_folder_clicked()
+  - on_settings_clicked()
+  - update_stats()
+}
+
+class DownloadManager {
+  - List~DownloadRow~ downloads
+  - List~DownloadRow~ pending_queue
+  - DownloadRow active_download
+  - bool is_downloading
+  - string ytdlp_path
+  - string ffmpeg_path
+  + add_download(row)
+  + remove_download(row)
+  + start_all()
+  + set_ytdlp_path(path)
+  + get_ytdlp_path()
+  + set_ffmpeg_path(path)
+  + get_ffmpeg_path()
+  + get_pending_count()
+  + has_pending()
+  + has_active()
+  ~ start_next()
+  ~ on_download_finished()
+  ~ update_queue_positions()
+  <<signal>> download_status_changed
+  <<signal>> all_completed
+  <<signal>> queue_updated
+}
+
+class DownloadRow {
+  - string url
+  - string title
+  - string _status
+  - int queue_position
+  - string file_size
+  - string ytdlp_path
+  - string ffmpeg_path
+  - string download_folder
+  - int child_pid
+  - bool is_cancelled
+  + DownloadRow(url, folder, ytdlp, ffmpeg)
+  + start_download()
+  + on_cancel()
+  + can_remove()
+  + get_filename()
+  - get_video_info()
+  - start_ffmpeg_download()
+  - parse_ffmpeg_output()
+  - format_size()
+  <<signal>> download_started
+  <<signal>> download_finished
+}
+
+class Settings {
+  - string config_dir
+  - string config_file
+  - KeyFile keyfile
+  - string _download_folder
+  - string _ytdlp_path
+  - string _ffmpeg_path
+  + download_folder {get; set}
+  + ytdlp_path {get; set}
+  + ffmpeg_path {get; set}
+  + ensure_download_folder_exists()
+  + check_ytdlp()
+  + check_ffmpeg()
+  - load()
+  - save()
+  - find_in_path()
+}
+
+class SettingsDialog {
+  - Entry download_folder_entry
+  - Entry ytdlp_entry
+  - Entry ffmpeg_entry
+  - Settings settings
+  - DownloadManager download_manager
+  + SettingsDialog(parent, settings, manager)
+  - create_file_chooser_row()
+  - on_save()
+}
+
+SmotrimDownloader --> MainWindow
+MainWindow --> DownloadManager
+MainWindow --> Settings
+MainWindow --> SettingsDialog
+DownloadManager --> DownloadRow
+SettingsDialog --> Settings
+SettingsDialog --> DownloadManager
+
+@enduml

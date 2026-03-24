@@ -2,9 +2,7 @@
 Type=Application
 Name=Smotrim Downloader
 Comment=Download videos from smotrim.ru
-Exec=@BINDIR@/smotrim-downloader
+Exec=smotrim-downloader
 Icon=smotrim-downloader
 Categories=Network;Video;
 Terminal=false
-StartupNotify=true
-X-GNOME-UsesNotifications=true

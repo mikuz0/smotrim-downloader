@@ -1,0 +1,24 @@
+@startuml
+!theme plain
+skinparam backgroundColor #FAFAFA
+
+title Settings File Structure
+file "~/.config/smotrim-downloader/settings.ini" as file {
+    [General]
+    download_folder = /home/user/Видео/Smotrim
+    
+    [Paths]
+    ytdlp = /usr/bin/yt-dlp
+    ffmpeg = /usr/bin/ffmpeg
+}
+
+note right of file
+  **Поля:**
+  * download_folder - папка для сохранения
+  * ytdlp - путь к yt-dlp
+  * ffmpeg - путь к ffmpeg
+  * (загружаются при старте,
+    сохраняются при изменении)
+end note
+
+@enduml

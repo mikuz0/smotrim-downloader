@@ -36,14 +36,10 @@ compile_commands.json
 *.dylib
 *.a
 *.lib
-smotrim-downloader
 
 # Файлы установки
 install_manifest.txt
 dist/
-*.deb
-*.tar.gz
-*.rpm
 
 # IDE и редакторы
 .vscode/
@@ -62,13 +58,6 @@ gdb_history
 *.gcda
 *.gcov
 
-# Документация
-docs/_build/
-docs/api/
-*.html
-*.aux
-*.log
-
 # OS специфичные
 .DS_Store
 Thumbs.db
@@ -82,18 +71,21 @@ ehthumbs.db
 *.c.stamp
 *.h.stamp
 
-# Зависимости (если используются)
-vendor/
-.deps/
-libs/
+# Debian сборка (временные файлы)
+debian/.debhelper/
+debian/files
+debian/*.debhelper
+debian/*.substvars
+debian/tmp/
+debian/*.log
 
-# Файлы пакетов
-*.deb
-*.rpm
-*.dmg
-*.pkg
+# Debian исходники (игнорируем, но сохраняем deb-пакеты)
+*.buildinfo
+*.changes
+*.dsc
+*.tar.gz
+*.tar.xz
+*.orig.tar.*
 
-# Конфигурация пользователя
-.config/
-.local/
-.cache/
+# DEB пакеты НЕ игнорируем — они будут в git
+# !*.deb
